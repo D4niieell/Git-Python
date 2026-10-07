@@ -1,0 +1,114 @@
+# Explicação do seu histórico no Git
+
+Vou seguir a ordem em que as coisas aconteceram.
+
+## 1. O primeiro erro: `--no--edit`
+
+```
+$ git revert --no--edit 875c86a
+usage: git revert [--[no-]edit] ...
+```
+
+Você digitou `--no--edit` (dois hifens duplicados). O correto é `--no-edit` (um hifen entre `no` e `edit`). Como o Git não reconheceu a opção, ele só mostrou o texto de ajuda (*usage*) com as opções válidas e não fez nada.
+
+## 2. O `git revert` que funcionou
+
+```
+$ git revert --no-edit 875c86a
+[main 7cd72c6] Revert "..."
+ 1 file changed, 11 deletions(-)
+```
+
+O `git revert` **não apaga** um commit antigo. Ele cria um **novo commit** que desfaz as alterações do commit indicado. Aqui, o commit `875c86a` tinha adicionado 11 linhas, então o revert criou o `7cd72c6` removendo essas 11 linhas. O `--no-edit` faz o Git usar a mensagem padrão (`Revert "..."`) sem abrir o editor.
+
+Histórico depois disso:
+```
+7cd72c6 Revert "..."          <- novo
+556ff7f Adicionei Pao de batata
+875c86a ...
+0501b6e ...
+```
+
+## 3. O `git push`
+
+O push enviou o revert para o GitHub (`556ff7f..7cd72c6`). A mensagem `remote: This repository moved` é só um aviso: o repositório foi renomeado/movido no GitHub (agora é `Git-Python`). O push funcionou normalmente, mas vale atualizar a URL com:
+
+```
+git remote set-url origin https://github.com/D4niieell/Git-Python.git
+```
+
+## 4. Revertendo o revert
+
+```
+$ git revert --no-edit 7cd72c6
+[main 384bd5f] Reapply "..."
+ 1 file changed, 11 insertions(+)
+```
+
+Você desfez o desfazer. O Git criou o commit `384bd5f` ("Reapply"), que **devolve as 11 linhas**. Depois, fez push. É por isso que aparece o `*  History restored` no seu terminal: o conteúdo voltou ao que era antes.
+
+O ponto-chave: o histórico **não voltou no tempo**, ele só ganhou mais commits. Por isso o `git revert` é seguro para commits já enviados ao GitHub.
+
+## 5. Um commit normal
+
+```
+$ git add .
+$ git commit -m "Mensagem de teste do git"
+[main b359389] ...
+ 1 file changed, 2 insertions(+)
+```
+
+Você alterou o `hello-world.py`, adicionou à área de stage e commitou (`b359389`), ainda **sem fazer push** (por isso o `origin/main` continuava em `384bd5f`).
+
+## 6. Revert de um commit local
+
+```
+$ git revert --no-edit b359389
+[main 176cfb6] Revert "Mensagem de teste do git"
+ 1 file changed, 2 deletions(-)
+```
+
+Criou o commit `176cfb6`, que remove as 2 linhas adicionadas.
+
+## 7. O `git commit` que não fez nada
+
+```
+$ git commit -m "Alterção com o reset"
+nothing to commit, working tree clean
+```
+
+O revert **já cria o commit sozinho**, então não havia mais nada para commitar. O Git avisou que sua branch está 2 commits à frente do `origin/main` (o `b359389` e o `176cfb6`), ainda não enviados.
+
+## 8. O `git reset --soft HEAD~1`
+
+```
+$ git reset --soft HEAD~1
+```
+
+Aqui o histórico foi realmente movido. O `HEAD~1` significa "um commit atrás". O `--soft` faz o seguinte:
+
+- **Move** a branch para o commit anterior (descarta o commit `176cfb6` do histórico);
+- **Mantém** as alterações desse commit na área de stage (*staged*), prontas para commitar de novo.
+
+Como o `176cfb6` era o revert que removia as 2 linhas, agora essas remoções ficam **preparadas no stage**. Seu histórico fica assim:
+
+```
+b359389 (HEAD -> main) Mensagem de teste do git
+384bd5f (origin/main) Reapply "..."
+...
+```
+
+E o `git status` mostraria as 2 linhas removidas como alteração pendente (staged).
+
+## Resumo: revert vs. reset
+
+| | `git revert` | `git reset` |
+|---|---|---|
+| O que faz | Cria um novo commit que desfaz outro | Move a branch para trás |
+| Histórico | Preservado (só cresce) | Reescrito |
+| Seguro após `push`? | Sim | Não (exige `push --force`) |
+| Use quando | O commit já foi enviado | O commit só existe localmente |
+
+No seu caso, o `reset --soft` foi seguro porque o `176cfb6` ainda não tinha sido enviado ao GitHub.
+
+Se quiser, posso mostrar como deixar o repositório exatamente como você quer agora (por exemplo, descartar de vez as alterações pendentes ou voltar ao estado do `origin/main`).

@@ -1,0 +1,134 @@
+* Explicação detalhada da sua sessão do Git
+
+Você está praticando os comandos de **desfazer alterações** no Git (`revert`, `reset`, `restore`). Vou explicar em ordem cronológica.
+
+* 1. Estado inicial
+
+```
+c7db14e (HEAD -> main) Criando um erro para ser corrigido com o revert
+719fbea (origin/main) Revert "Criando erro de commit para revert"
+...
+```
+
+- **HEAD -> main**: você está na branch `main`, no commit `c7db14e`.
+- **origin/main**: o repositório remoto (GitHub, por exemplo) está um commit atrás, em `719fbea`. Ou seja, `c7db14e` só existe localmente.
+- O histórico mostra que você já praticou `--amend` (commit `541a205`) e `revert` (commits `0f97d76` e `719fbea`).
+
+* 2. Primeira tentativa de revert (falhou)
+
+```
+$ git revert --no-edit c7db14e
+error: your local changes would be overwritten by revert.
+hint: commit your changes or stash them to proceed.
+```
+
+**O que é o `git revert`?** Ele cria um **novo commit** que desfaz as mudanças de um commit anterior. Não apaga nada do histórico, o que o torna seguro para commits já enviados ao remoto.
+
+**Por que falhou?** Você tinha alterações não commitadas no `main.py`. O revert precisaria modificar esse mesmo arquivo, e o Git se recusou para não sobrescrever o seu trabalho. As opções seriam: fazer commit, usar `git stash` ou descartar as mudanças.
+
+**`--no-edit`**: usa a mensagem automática (`Revert "..."`) sem abrir o editor.
+
+* 3. Você escolheu fazer commit
+
+```
+$ git add .
+$ git commit -m "teste de revert"
+[main 5260056] teste de revert
+1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+- `git add .`: coloca todas as alterações na **staging area** (área de preparação).
+- `git commit`: grava o commit `5260056`, que alterou 1 linha do `main.py`.
+
+* 4. Revert do commit novo (funcionou)
+
+```
+$ git revert --no-edit 5260056
+[main c3e603f] Revert "teste de revert"
+```
+
+Agora o working directory estava limpo, então o revert funcionou. Note que você reverteu o `5260056` (o "teste de revert"), **não** o `c7db14e` que tentou antes. O novo commit `c3e603f` desfaz exatamente a mudança do `5260056`.
+
+Histórico agora:
+```
+c3e603f Revert "teste de revert"     ← desfaz o 5260056
+5260056 teste de revert
+c7db14e ...
+```
+
+O `5260056` continua no histórico; o Git apenas adicionou outro commit que anula o efeito dele. Isso é o diferencial do `revert`.
+
+* 5. Preparando o teste do reset
+
+```
+$ git add .
+$ git status
+Changes to be committed:
+        modified:   main.py
+```
+
+Você editou o `main.py` de novo e o colocou na staging area. Também aparece "ahead of 'origin/main' by 3 commits": você tem 3 commits locais (`c7db14e`, `5260056`, `c3e603f`) que não foram enviados.
+
+```
+$ git commit -m "Alteracao com o reset"
+[main f0f30a3] Alteracao com o reset
+```
+
+Criou o commit `f0f30a3`, que serve de "cobaia" para o `reset`.
+
+* 6. O `git reset --soft HEAD~1`
+
+```
+$ git reset --soft HEAD~1
+```
+
+Desfaz o último commit **movendo o ponteiro da branch** para trás.
+
+- **`HEAD~1`**: "um commit antes do HEAD atual" (ou seja, `c3e603f`).
+- **`--soft`**: mantém as alterações **na staging area**.
+
+Resultado no log: o commit `f0f30a3` **sumiu** do histórico, e o `HEAD` voltou para `c3e603f`. E o `git status` confirma que o `main.py` continua em "Changes to be committed", ou seja, a alteração não foi perdida, só deixou de estar commitada.
+
+* Os três tipos de reset
+
+| Tipo | Move o HEAD | Staging area | Arquivos (working dir) |
+|---|---|---|---|
+| `--soft` | Sim | **Mantém** | Mantém |
+| `--mixed` (padrão) | Sim | Limpa | Mantém |
+| `--hard` | Sim | Limpa | **Apaga as alterações** |
+
+* 7. Limpando tudo
+
+```
+$ git restore --staged main.py
+$ git restore main.py
+```
+
+Aqui você descartou a alteração em duas etapas:
+
+1. **`git restore --staged main.py`**: tira o arquivo da staging area. A mudança continua no arquivo, mas como "não preparada".
+2. **`git restore main.py`**: descarta a modificação no arquivo, restaurando-o à versão do último commit.
+
+Agora o repositório está limpo. (Cuidado: `git restore` sem `--staged` **perde as alterações definitivamente**, pois elas não estão em nenhum commit.)
+
+* Revert vs. Reset
+
+| | `git revert` | `git reset` |
+|---|---|---|
+| O que faz | Cria um novo commit que desfaz outro | Move o ponteiro e "apaga" commits do histórico |
+| Histórico | Preservado | Reescrito |
+| Seguro após `push`? | **Sim** | **Não** (causa conflitos para outros) |
+| Uso típico | Desfazer algo já publicado | Corrigir commits locais, ainda não enviados |
+
+* Situação final
+
+```
+c3e603f (HEAD -> main) Revert "teste de revert"
+5260056 teste de revert
+c7db14e Criando um erro para ser corrigido com o revert
+719fbea (origin/main) ...
+```
+
+Seu repositório local está 3 commits à frente do remoto, com o working directory limpo. Se quiser enviar, basta `git push`.
+
+Se quiser, posso mostrar também como o `reset --mixed` e o `--hard` se comportariam nesse mesmo cenário, ou como usar `git reflog` para recuperar o commit `f0f30a3` que "sumiu".

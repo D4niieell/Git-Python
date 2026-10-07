@@ -1,2 +1,8 @@
 print("Olá, mundo!")
 print("Pão de batata")
+# print("LeBron James!")
+# print("Mensagem corrigida!")
+# print("Essa alteração será corrigida com o revert")
+print("Essa alteração será corrigida com o reset")
+print("Essa alteração será corrigida com o revert, após o push")
+print("Nova mensagem para o git!")
