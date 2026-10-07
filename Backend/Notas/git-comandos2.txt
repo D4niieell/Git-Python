@@ -1,0 +1,110 @@
+# O que aconteceu no seu terminal
+
+Vou explicar em ordem cronológica, em blocos.
+
+## 1. Erro de digitação no `git revert`
+
+```
+$ git revert --no--edit 875c86a
+usage: git revert [--[no-]edit] ...
+```
+
+Você digitou `--no--edit` (dois hífens duplicados). O correto é `--no-edit`. Como a opção não existe, o Git só mostrou o texto de ajuda e não fez nada.
+
+## 2. Revert do commit `875c86a`
+
+```
+$ git revert --no-edit 875c86a
+[main 7cd72c6] Revert "..."
+ 1 file changed, 11 deletions(-)
+```
+
+O `git revert` **não apaga** o commit antigo. Ele cria um **novo commit** que desfaz as mudanças do anterior. Aqui, o commit `875c86a` tinha adicionado 11 linhas, então o revert removeu 11 linhas (`7cd72c6`). O `--no-edit` só evita abrir o editor para a mensagem do commit.
+
+## 3. Push
+
+```
+$ git push
+remote: This repository moved. Please use the new location:
+remote:   https://github.com/D4niieell/Git-Python.git
+```
+
+O push funcionou (`556ff7f..7cd72c6 main -> main`). A mensagem do GitHub é só um **aviso**: o repositório foi renomeado/movido. Você ainda está enviando para a URL antiga (`.../Python.git`), que redireciona. Para corrigir:
+
+```
+git remote set-url origin https://github.com/D4niieell/Git-Python.git
+```
+
+## 4. Revert do revert
+
+```
+$ git revert --no-edit 7cd72c6
+[main 384bd5f] Reapply "..."
+ 1 file changed, 11 insertions(+)
+```
+
+Você desfez o revert anterior, ou seja, as 11 linhas **voltaram**. Foi uma forma segura de "restaurar o histórico" (como você anotou depois). Em seguida você deu push de novo.
+
+## 5. Commit normal
+
+```
+$ git add .
+$ git commit -m "Mensagem de teste do git"
+[main b359389] ...
+ 1 file changed, 2 insertions(+)
+```
+
+Você alterou o `hello-world.py` (+2 linhas), colocou na área de preparação (`add`) e commitou (`b359389`). Esse commit ainda **não foi enviado** ao GitHub (o `origin/main` continuava em `384bd5f`).
+
+## 6. Revert local e o "nothing to commit"
+
+```
+$ git revert --no-edit b359389
+[main 176cfb6] Revert "Mensagem de teste do git"
+
+$ git commit -m "Alterção com o reset"
+nothing to commit, working tree clean
+```
+
+O `git revert` já cria o commit sozinho. Por isso, quando você tentou `git commit` logo depois, não havia nada novo para commitar. A mensagem "ahead of 'origin/main' by 2 commits" mostra que você tinha 2 commits locais não enviados (o commit de teste e o revert dele).
+
+## 7. `git reset --soft HEAD~1`
+
+```
+$ git reset --soft HEAD~1
+```
+
+Isso **desfaz o último commit** (o revert `176cfb6`), mas **mantém as mudanças na área de preparação (staged)**. Ou seja, o commit sumiu do histórico, mas o conteúdo dele (remover as 2 linhas) ficou pronto para ser commitado.
+
+## 8. Limpando as mudanças
+
+```
+$ git restore --staged main.py
+error: pathspec 'main.py' did not match any file(s) known to git
+```
+
+Erro: não existe arquivo `main.py` no repositório. O arquivo se chama `hello-world.py`.
+
+```
+$ git restore --staged hello-world.py   # tira da área de preparação
+$ git restore hello-world.py            # descarta a alteração no arquivo
+```
+
+O primeiro comando tira o arquivo do *staged*; o segundo descarta a modificação no arquivo de trabalho.
+
+## Situação final
+
+Depois do `reset --soft`, o `HEAD` está em `b359389` ("Mensagem de teste do git"), que ainda tem as 2 linhas adicionadas. Como você restaurou o arquivo para o estado do `HEAD`, o arquivo **mantém essas 2 linhas**, e o commit `b359389` continua existindo localmente, sem push.
+
+## Resumo dos comandos
+
+| Comando | O que faz |
+|---|---|
+| `git revert <commit>` | Cria um novo commit que desfaz outro (seguro para histórico compartilhado) |
+| `git reset --soft HEAD~1` | Remove o último commit, mantendo as mudanças *staged* |
+| `git restore --staged <arq>` | Tira o arquivo da área de preparação |
+| `git restore <arq>` | Descarta alterações não commitadas do arquivo |
+
+**Dica:** se quisesse apenas descartar o commit `b359389` local (não enviado), o mais direto seria `git reset --hard HEAD~1`. Use `revert` quando o commit já foi enviado ao remoto, e `reset` quando ainda é só local.
+
+Quer que eu explique alguma parte com mais detalhe?
